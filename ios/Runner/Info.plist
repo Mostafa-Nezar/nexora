@@ -26,6 +26,13 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Tools needs local network access to discover nearby devices and transfer files securely at high speed.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tools-share._tcp</string>
+		<string>_tools-share._udp</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

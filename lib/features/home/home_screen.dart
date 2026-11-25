@@ -8,6 +8,7 @@ import '../connectivity/connectivity_screen.dart';
 import '../security/security_screen.dart';
 import '../media_tools/media_tools_screen.dart';
 import '../utilities/utilities_screen.dart';
+import '../device_sharing/device_sharing_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -141,6 +142,17 @@ class HomeScreen extends StatelessWidget {
                     bgColor: AppColors.mediaBg,
                     accentColor: AppColors.mediaAccent,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MediaToolsScreen())),
+                  ),
+
+                  // Row 5: Tab 9 = Device Sharing (Advanced File Transfer)
+                  _buildToolCard(
+                    context: context,
+                    title: 'Device Sharing',
+                    subtitle: 'AirDrop, QuickShare, Wi-Fi Direct',
+                    icon: Icons.wifi_tethering,
+                    bgColor: AppColors.sharingBg,
+                    accentColor: AppColors.sharingAccent,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSharingScreen())),
                   ),
                 ],
               ),

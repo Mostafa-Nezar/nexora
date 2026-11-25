@@ -37,6 +37,10 @@ class AppColors {
   static const Color mediaBg = Color(0xFF03221C);
   static const Color mediaAccent = Color(0xFF14B8A6);
 
+  // 9. Device Sharing (Dark Indigo / Electric Cyan)
+  static const Color sharingBg = Color(0xFF0C192E);
+  static const Color sharingAccent = Color(0xFF38BDF8);
+
   static const Color textPrimary = Color(0xFFF9FAFB);
   static const Color textSecondary = Color(0xFF9CA3AF);
   static const Color textMuted = Color(0xFF6B7280);
