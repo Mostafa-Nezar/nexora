@@ -3,16 +3,12 @@ import '../../core/theme/app_colors.dart';
 import '../scanner/scanner_screen.dart';
 import '../device_controls/device_controls_screen.dart';
 import '../file_manager/file_manager_screen.dart';
-import '../utilities/utilities_screen.dart';
 import 'home_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int initialIndex;
 
-  const MainNavigationScreen({
-    super.key,
-    this.initialIndex = 0,
-  });
+  const MainNavigationScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -30,10 +26,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   ];
 
   final List<_NavItemData> _navItems = const [
-    _NavItemData(icon: Icons.grid_view_rounded, activeIcon: Icons.grid_view, label: 'الرئيسية'),
-    _NavItemData(icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: 'الماسح'),
-    _NavItemData(icon: Icons.smartphone_outlined, activeIcon: Icons.smartphone, label: 'الجهاز'),
-    _NavItemData(icon: Icons.folder_outlined, activeIcon: Icons.folder, label: 'الملفات'),
+    _NavItemData(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Home',
+    ),
+    _NavItemData(
+      icon: Icons.qr_code_scanner_outlined,
+      activeIcon: Icons.qr_code_scanner_rounded,
+      label: 'Scanner',
+    ),
+    _NavItemData(
+      icon: Icons.devices_other_outlined,
+      activeIcon: Icons.devices_other_rounded,
+      label: 'Device',
+    ),
+    _NavItemData(
+      icon: Icons.folder_open_outlined,
+      activeIcon: Icons.folder_open_rounded,
+      label: 'Files',
+    ),
   ];
 
   @override
@@ -62,10 +74,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
             // Active Page Body
             Expanded(
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: _pages,
-              ),
+              child: IndexedStack(index: _selectedIndex, children: _pages),
             ),
           ],
         ),
@@ -81,7 +90,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         color: AppColors.background,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withOpacity(0.06),
+            color: Colors.white.withValues(alpha: 0.06),
             width: 1,
           ),
         ),
@@ -102,9 +111,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -154,75 +165,88 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Widget _buildCustomBottomNav() {
     return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF070D1E),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
+        color: const Color(0xFF0B1324),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
-        border: Border(
-          top: BorderSide(
-            color: const Color(0xFF10B981).withOpacity(0.2),
-            width: 1.2,
-          ),
-        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: SafeArea(
         top: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: List.generate(_navItems.length, (index) {
             final isSelected = _selectedIndex == index;
             final item = _navItems[index];
 
-            return InkWell(
-              onTap: () => _onItemTapped(index),
-              borderRadius: BorderRadius.circular(16),
-              splashColor: const Color(0xFF10B981).withOpacity(0.15),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeInOut,
-                padding: EdgeInsets.symmetric(
-                  horizontal: isSelected ? 16 : 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFF10B981).withOpacity(0.15)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: isSelected
-                      ? Border.all(color: const Color(0xFF10B981).withOpacity(0.4), width: 1)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
-                      color: isSelected ? const Color(0xFF10B981) : const Color(0xFF6B7280),
-                      size: 24,
+            return Expanded(
+              child: Semantics(
+                button: true,
+                selected: isSelected,
+                label: item.label,
+                child: InkWell(
+                  onTap: () => _onItemTapped(index),
+                  borderRadius: BorderRadius.circular(18),
+                  splashColor: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF10B981).withValues(alpha: 0.07)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                    if (isSelected) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        item.label,
-                        style: const TextStyle(
-                          color: Color(0xFF10B981),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          width: 42,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(
+                                    0xFF10B981,
+                                  ).withValues(alpha: 0.16)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            color: isSelected
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF8993A7),
+                            size: 21,
+                          ),
                         ),
-                      ),
-                    ],
-                  ],
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF8993A7),
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            fontSize: 10.5,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );
