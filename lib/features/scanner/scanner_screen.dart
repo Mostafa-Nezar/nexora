@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/native_context_menu_wrapper.dart';
 
 class ScannerScreen extends StatelessWidget {
@@ -9,7 +10,10 @@ class ScannerScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
-        title: const Text('Scanner & Vision', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Scanner & Vision',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF04201A),
         elevation: 0,
       ),
@@ -30,12 +34,19 @@ class ScannerScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 ElevatedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Starting live camera scanner engine...')),
+                    AppToast.error(
+                      context,
+                      'Live camera scanning is not implemented yet.',
                     );
                   },
                   icon: const Icon(Icons.camera_alt, color: Colors.black),
-                  label: const Text('Open QR / Barcode Scanner', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Open QR / Barcode Scanner',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     minimumSize: const Size.fromHeight(45),
@@ -48,7 +59,8 @@ class ScannerScreen extends StatelessWidget {
 
           NativeContextMenuWrapper(
             title: 'OCR Recognized Text',
-            shareContent: 'Recognized Sample Text: INVOICE #8942\nTotal: 1,450.00 EGP\nDate: 2026-11-24',
+            shareContent:
+                'Recognized Sample Text: INVOICE #8942\nTotal: 1,450.00 EGP\nDate: 2026-11-24',
             child: _buildCard(
               title: 'OCR & Text Recognition (On-Device)',
               icon: Icons.document_scanner,
@@ -70,7 +82,11 @@ class ScannerScreen extends StatelessWidget {
                     ),
                     child: const Text(
                       'Sample OCR Output:\nINVOICE #8942\nTotal: 1,450.00 EGP\nDate: 2026-11-24\n(Long-press to Copy or Share)',
-                      style: TextStyle(color: Colors.tealAccent, fontFamily: 'monospace', fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.tealAccent,
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -105,7 +121,11 @@ class ScannerScreen extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

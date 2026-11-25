@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/native_context_menu_wrapper.dart';
 
 class DeviceControlsScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
 
   // Device Info
   Map<String, dynamic> _deviceData = {};
-  bool _torchOn = false;
 
   @override
   void initState() {
@@ -49,31 +49,62 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
           _batteryState = state;
         });
       }
-      _batterySubscription = _battery.onBatteryStateChanged.listen((state) async {
-        final lvl = await _battery.batteryLevel;
-        if (mounted) {
-          setState(() {
-            _batteryState = state;
-            _batteryLevel = lvl;
-          });
-        }
-      });
-    } catch (_) {}
+      _batterySubscription = _battery.onBatteryStateChanged.listen(
+        (state) async {
+          try {
+            final lvl = await _battery.batteryLevel;
+            if (mounted) {
+              setState(() {
+                _batteryState = state;
+                _batteryLevel = lvl;
+              });
+            }
+          } catch (error) {
+            if (mounted) {
+              AppToast.error(context, 'Could not read battery status: $error');
+            }
+          }
+        },
+        onError: (Object error) {
+          if (mounted) {
+            AppToast.error(context, 'Battery monitoring failed: $error');
+          }
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(context, 'Could not read battery status: $error');
+      }
+    }
   }
 
   void _initSensors() {
     try {
-      _accelSubscription = accelerometerEventStream().listen((event) {
-        if (mounted) {
-          setState(() => _accelerometerEvent = event);
-        }
-      });
-      _gyroSubscription = gyroscopeEventStream().listen((event) {
-        if (mounted) {
-          setState(() => _gyroscopeEvent = event);
-        }
-      });
-    } catch (_) {}
+      _accelSubscription = accelerometerEventStream().listen(
+        (event) {
+          if (mounted) {
+            setState(() => _accelerometerEvent = event);
+          }
+        },
+        onError: (Object error) {
+          if (mounted) AppToast.error(context, 'Accelerometer failed: $error');
+        },
+      );
+      _gyroSubscription = gyroscopeEventStream().listen(
+        (event) {
+          if (mounted) {
+            setState(() => _gyroscopeEvent = event);
+          }
+        },
+        onError: (Object error) {
+          if (mounted) AppToast.error(context, 'Gyroscope failed: $error');
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(context, 'Could not start device sensors: $error');
+      }
+    }
   }
 
   Future<void> _initDeviceInfo() async {
@@ -84,27 +115,33 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
           _deviceData = info.data;
         });
       }
-    } catch (_) {}
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(context, 'Could not read device information: $error');
+      }
+    }
   }
 
-  void _triggerHaptic(HapticFeedbackType type) {
-    switch (type) {
-      case HapticFeedbackType.light:
-        HapticFeedback.lightImpact();
-        break;
-      case HapticFeedbackType.medium:
-        HapticFeedback.mediumImpact();
-        break;
-      case HapticFeedbackType.heavy:
-        HapticFeedback.heavyImpact();
-        break;
-      case HapticFeedbackType.vibrate:
-        HapticFeedback.vibrate();
-        break;
+  Future<void> _triggerHaptic(HapticFeedbackType type) async {
+    try {
+      switch (type) {
+        case HapticFeedbackType.light:
+          await HapticFeedback.lightImpact();
+          break;
+        case HapticFeedbackType.medium:
+          await HapticFeedback.mediumImpact();
+          break;
+        case HapticFeedbackType.heavy:
+          await HapticFeedback.heavyImpact();
+          break;
+        case HapticFeedbackType.vibrate:
+          await HapticFeedback.vibrate();
+          break;
+      }
+      if (mounted) AppToast.success(context, 'Haptic feedback triggered.');
+    } catch (error) {
+      if (mounted) AppToast.error(context, 'Haptic feedback failed: $error');
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Haptic Triggered: ${type.name}'), duration: const Duration(milliseconds: 600)),
-    );
   }
 
   @override
@@ -120,7 +157,10 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
-        title: const Text('Device Controls & Hardware', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Device Controls & Hardware',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF08152B),
         elevation: 0,
       ),
@@ -135,16 +175,18 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _torchOn ? 'Torch State: ON' : 'Torch State: OFF',
-                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                const Text(
+                  'Torch control is unavailable',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
                 Switch(
-                  value: _torchOn,
-                  activeColor: Colors.amberAccent,
-                  onChanged: (val) {
-                    setState(() => _torchOn = val);
-                    HapticFeedback.selectionClick();
+                  value: false,
+                  activeThumbColor: Colors.amberAccent,
+                  onChanged: (_) {
+                    AppToast.error(
+                      context,
+                      'Flashlight control is not available yet.',
+                    );
                   },
                 ),
               ],
@@ -163,15 +205,30 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Level: $_batteryLevel%', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('State: ${_batteryState.name.toUpperCase()}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Level: $_batteryLevel%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'State: ${_batteryState.name.toUpperCase()}',
+                      style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 LinearProgressIndicator(
                   value: _batteryLevel / 100.0,
                   backgroundColor: Colors.white10,
-                  valueColor: AlwaysStoppedAnimation<Color>(_batteryLevel < 20 ? Colors.redAccent : Colors.greenAccent),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _batteryLevel < 20 ? Colors.redAccent : Colors.greenAccent,
+                  ),
                 ),
               ],
             ),
@@ -189,23 +246,43 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () => _triggerHaptic(HapticFeedbackType.light),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
-                  child: const Text('Light', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                  ),
+                  child: const Text(
+                    'Light',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () => _triggerHaptic(HapticFeedbackType.medium),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
-                  child: const Text('Medium', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                  ),
+                  child: const Text(
+                    'Medium',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () => _triggerHaptic(HapticFeedbackType.heavy),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B)),
-                  child: const Text('Heavy', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                  ),
+                  child: const Text(
+                    'Heavy',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: () => _triggerHaptic(HapticFeedbackType.vibrate),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-                  child: const Text('Vibrate', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                  ),
+                  child: const Text(
+                    'Vibrate',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             ),
@@ -220,20 +297,38 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Accelerometer (m/s²):', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Accelerometer (m/s²):',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Text(
                   _accelerometerEvent != null
                       ? 'X: ${_accelerometerEvent!.x.toStringAsFixed(2)} | Y: ${_accelerometerEvent!.y.toStringAsFixed(2)} | Z: ${_accelerometerEvent!.z.toStringAsFixed(2)}'
                       : 'Waiting for sensor input...',
-                  style: const TextStyle(color: Colors.cyanAccent, fontFamily: 'monospace'),
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontFamily: 'monospace',
+                  ),
                 ),
                 const SizedBox(height: 12),
-                const Text('Gyroscope (rad/s):', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Gyroscope (rad/s):',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Text(
                   _gyroscopeEvent != null
                       ? 'X: ${_gyroscopeEvent!.x.toStringAsFixed(2)} | Y: ${_gyroscopeEvent!.y.toStringAsFixed(2)} | Z: ${_gyroscopeEvent!.z.toStringAsFixed(2)}'
                       : 'Waiting for gyro input...',
-                  style: const TextStyle(color: Colors.cyanAccent, fontFamily: 'monospace'),
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ],
             ),
@@ -243,7 +338,10 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
           // Device Information (with Native Context Menu on Long-Press)
           NativeContextMenuWrapper(
             title: 'Device Hardware Metadata',
-            shareContent: _deviceData.entries.take(15).map((e) => '${e.key}: ${e.value}').join('\n'),
+            shareContent: _deviceData.entries
+                .take(15)
+                .map((e) => '${e.key}: ${e.value}')
+                .join('\n'),
             child: _buildCard(
               title: 'Device & OS Information (Long-press for options)',
               icon: Icons.info_outline,
@@ -251,15 +349,25 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Hold (Long Press) this card to copy or share device details!',
-                      style: TextStyle(color: Colors.amberAccent, fontSize: 12)),
+                  const Text(
+                    'Hold (Long Press) this card to copy or share device details!',
+                    style: TextStyle(color: Colors.amberAccent, fontSize: 12),
+                  ),
                   const SizedBox(height: 8),
-                  ..._deviceData.entries.take(6).map(
+                  ..._deviceData.entries
+                      .take(6)
+                      .map(
                         (e) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2.0),
-                          child: Text('${e.key}: ${e.value}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 13, fontFamily: 'monospace'),
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            '${e.key}: ${e.value}',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                 ],
@@ -294,7 +402,11 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

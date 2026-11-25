@@ -10,7 +10,8 @@ import 'package:path/path.dart' as p;
 import '../models/transfer_models.dart';
 
 class DeviceSharingService extends ChangeNotifier {
-  static final DeviceSharingService _instance = DeviceSharingService._internal();
+  static final DeviceSharingService _instance =
+      DeviceSharingService._internal();
   factory DeviceSharingService() => _instance;
   DeviceSharingService._internal();
 
@@ -35,7 +36,8 @@ class DeviceSharingService extends ChangeNotifier {
   bool isBroadcasting = false;
   bool isServerRunning = false;
   final Map<String, DiscoveredDevice> _discoveredDevices = {};
-  List<DiscoveredDevice> get nearbyDevices => _discoveredDevices.values.toList();
+  List<DiscoveredDevice> get nearbyDevices =>
+      _discoveredDevices.values.toList();
 
   final List<TransferItem> _transfers = [];
   List<TransferItem> get transfers => List.unmodifiable(_transfers);
@@ -43,7 +45,17 @@ class DeviceSharingService extends ChangeNotifier {
   // Incoming transfer requests awaiting user approval
   final StreamController<IncomingTransferPrompt> _incomingTransferController =
       StreamController<IncomingTransferPrompt>.broadcast();
-  Stream<IncomingTransferPrompt> get incomingTransfers => _incomingTransferController.stream;
+  Stream<IncomingTransferPrompt> get incomingTransfers =>
+      _incomingTransferController.stream;
+  final StreamController<String> _errorController =
+      StreamController<String>.broadcast();
+  Stream<String> get errors => _errorController.stream;
+
+  void _reportError(String action, Object error) {
+    final message = '$action: $error';
+    debugPrint(message);
+    _errorController.add(message);
+  }
 
   // Active sockets for pause/cancel
   final Map<String, Socket> _activeTransferSockets = {};
@@ -69,28 +81,36 @@ class DeviceSharingService extends ChangeNotifier {
         devicePlatform = DevicePlatformType.android;
         final info = await deviceInfo.androidInfo;
         deviceName = '${info.brand.toUpperCase()} ${info.model}';
-        deviceId = info.id.isNotEmpty ? info.id : 'android_${info.fingerprint.hashCode}';
+        deviceId = info.id.isNotEmpty
+            ? info.id
+            : 'android_${info.fingerprint.hashCode}';
       } else if (Platform.isIOS) {
         devicePlatform = DevicePlatformType.ios;
         final info = await deviceInfo.iosInfo;
         deviceName = info.name.isNotEmpty ? info.name : 'iPhone';
-        deviceId = info.identifierForVendor ?? 'ios_${DateTime.now().millisecondsSinceEpoch}';
+        deviceId =
+            info.identifierForVendor ??
+            'ios_${DateTime.now().millisecondsSinceEpoch}';
       } else if (Platform.isWindows) {
         devicePlatform = DevicePlatformType.windows;
         final info = await deviceInfo.windowsInfo;
-        deviceName = info.computerName.isNotEmpty ? info.computerName : 'Windows PC';
+        deviceName = info.computerName.isNotEmpty
+            ? info.computerName
+            : 'Windows PC';
         deviceId = info.deviceId;
       } else if (Platform.isMacOS) {
         devicePlatform = DevicePlatformType.macos;
         final info = await deviceInfo.macOsInfo;
         deviceName = info.computerName;
-        deviceId = info.systemGUID ?? 'mac_${DateTime.now().millisecondsSinceEpoch}';
+        deviceId =
+            info.systemGUID ?? 'mac_${DateTime.now().millisecondsSinceEpoch}';
       } else {
         devicePlatform = DevicePlatformType.unknown;
         deviceName = 'Tools Device';
         deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
       }
     } catch (e) {
+      _reportError('Could not read device details', e);
       deviceName = 'Tools Device';
       deviceId = 'tools_${DateTime.now().millisecondsSinceEpoch}';
     }
@@ -112,7 +132,7 @@ class DeviceSharingService extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error detecting IP: $e');
+      _reportError('Could not detect the local IP address', e);
     }
   }
 
@@ -153,7 +173,9 @@ class DeviceSharingService extends ChangeNotifier {
       _cleanupTimer = Timer.periodic(const Duration(seconds: 3), (_) {
         final now = DateTime.now();
         final initialLen = _discoveredDevices.length;
-        _discoveredDevices.removeWhere((id, dev) => now.difference(dev.lastSeen).inSeconds > 6);
+        _discoveredDevices.removeWhere(
+          (id, dev) => now.difference(dev.lastSeen).inSeconds > 6,
+        );
         if (_discoveredDevices.length != initialLen) {
           notifyListeners();
         }
@@ -162,7 +184,7 @@ class DeviceSharingService extends ChangeNotifier {
       broadcastBeacon();
       notifyListeners();
     } catch (e) {
-      debugPrint('UDP Discovery error: $e');
+      _reportError('Device discovery failed', e);
     }
   }
 
@@ -180,9 +202,13 @@ class DeviceSharingService extends ChangeNotifier {
         'pin': currentPin,
       });
       final bytes = utf8.encode(payload);
-      _discoverySocket?.send(bytes, InternetAddress('255.255.255.255'), broadcastPort);
+      _discoverySocket?.send(
+        bytes,
+        InternetAddress('255.255.255.255'),
+        broadcastPort,
+      );
     } catch (e) {
-      debugPrint('Broadcast beacon error: $e');
+      _reportError('Could not search for nearby devices', e);
     }
   }
 
@@ -195,7 +221,10 @@ class DeviceSharingService extends ChangeNotifier {
       final senderId = json['id'] as String?;
       if (senderId == null || senderId == deviceId) return; // Ignore own beacon
 
-      final remoteDevice = DiscoveredDevice.fromJson(json, datagram.address.address);
+      final remoteDevice = DiscoveredDevice.fromJson(
+        json,
+        datagram.address.address,
+      );
       _discoveredDevices[remoteDevice.id] = remoteDevice;
       notifyListeners();
     } catch (_) {}
@@ -217,14 +246,20 @@ class DeviceSharingService extends ChangeNotifier {
   Future<void> startReceiverServer() async {
     if (isServerRunning) return;
     try {
-      _serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, tcpTransferPort);
+      _serverSocket = await ServerSocket.bind(
+        InternetAddress.anyIPv4,
+        tcpTransferPort,
+      );
       isServerRunning = true;
-      _serverSocket?.listen(_handleIncomingConnection, onError: (e) {
-        debugPrint('Server socket error: $e');
-      });
+      _serverSocket?.listen(
+        _handleIncomingConnection,
+        onError: (e) {
+          _reportError('File receiver failed', e);
+        },
+      );
       notifyListeners();
     } catch (e) {
-      debugPrint('Receiver server bind error: $e');
+      _reportError('Could not start the file receiver', e);
     }
   }
 
@@ -252,7 +287,9 @@ class DeviceSharingService extends ChangeNotifier {
       (chunk) async {
         if (!headerReceived) {
           buffer.addAll(chunk);
-          final nullTerminator = buffer.indexOf(0); // 0 byte terminates JSON header
+          final nullTerminator = buffer.indexOf(
+            0,
+          ); // 0 byte terminates JSON header
           if (nullTerminator != -1) {
             headerReceived = true;
             final headerBytes = buffer.sublist(0, nullTerminator);
@@ -266,7 +303,8 @@ class DeviceSharingService extends ChangeNotifier {
               final transferId = metadata!['transferId'] as String;
               final fileName = metadata!['fileName'] as String;
               expectedFileSize = (metadata!['fileSize'] as num).toInt();
-              final remoteDevName = metadata!['senderName'] as String? ?? 'Remote Device';
+              final remoteDevName =
+                  metadata!['senderName'] as String? ?? 'Remote Device';
               final providedPin = metadata!['pin'] as String? ?? '';
               final expectedSha = metadata!['checksum'] as String? ?? '';
 
@@ -323,7 +361,16 @@ class DeviceSharingService extends ChangeNotifier {
                 transferItem!.transferredBytes = receivedBytes;
               }
             } catch (err) {
-              socket.write(jsonEncode({'status': 'ERROR', 'msg': err.toString()}) + '\n');
+              if (transferItem != null) {
+                transferItem!.status = TransferStatus.failed;
+                transferItem!.errorMessage = err.toString();
+                notifyListeners();
+              } else {
+                _reportError('Incoming transfer failed', err);
+              }
+              socket.write(
+                jsonEncode({'status': 'ERROR', 'msg': err.toString()}) + '\n',
+              );
               await socket.close();
             }
           }
@@ -346,7 +393,8 @@ class DeviceSharingService extends ChangeNotifier {
             final elapsedMs = now.difference(lastSpeedCheck).inMilliseconds;
             if (elapsedMs >= 400) {
               final bytesInInterval = receivedBytes - lastCheckBytes;
-              transferItem!.speedBytesPerSec = (bytesInInterval / elapsedMs) * 1000;
+              transferItem!.speedBytesPerSec =
+                  (bytesInInterval / elapsedMs) * 1000;
               lastSpeedCheck = now;
               lastCheckBytes = receivedBytes;
               notifyListeners();
@@ -365,17 +413,23 @@ class DeviceSharingService extends ChangeNotifier {
                 integrityVerified = false;
               }
 
-              transferItem!.status = integrityVerified ? TransferStatus.completed : TransferStatus.failed;
+              transferItem!.status = integrityVerified
+                  ? TransferStatus.completed
+                  : TransferStatus.failed;
               if (!integrityVerified) {
-                transferItem!.errorMessage = 'Checksum integrity verification failed!';
+                transferItem!.errorMessage =
+                    'Checksum integrity verification failed!';
               }
               transferItem!.speedBytesPerSec = 0;
               notifyListeners();
 
-              socket.write(jsonEncode({
-                'status': integrityVerified ? 'SUCCESS' : 'FAILED',
-                'checksum': calculatedSha,
-              }) + '\n');
+              socket.write(
+                jsonEncode({
+                      'status': integrityVerified ? 'SUCCESS' : 'FAILED',
+                      'checksum': calculatedSha,
+                    }) +
+                    '\n',
+              );
               await socket.close();
             }
           }
@@ -383,8 +437,11 @@ class DeviceSharingService extends ChangeNotifier {
       },
       onDone: () async {
         await fileSink?.close();
-        if (transferItem != null && transferItem!.status == TransferStatus.transferring) {
-          transferItem!.status = TransferStatus.cancelled;
+        if (transferItem != null &&
+            transferItem!.status == TransferStatus.transferring) {
+          transferItem!.status = TransferStatus.failed;
+          transferItem!.errorMessage =
+              'Connection closed before transfer completed.';
           notifyListeners();
         }
       },
@@ -429,11 +486,14 @@ class DeviceSharingService extends ChangeNotifier {
     required File file,
     String? pin,
   }) async {
-    if (!await file.exists()) return;
+    if (!await file.exists()) {
+      throw FileSystemException('File does not exist', file.path);
+    }
 
     final fileName = p.basename(file.path);
     final fileSize = await file.length();
-    final transferId = 'tx_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}';
+    final transferId =
+        'tx_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}';
 
     // Compute checksum (SHA-256) streaming for integrity
     final fileBytesForSha = file.openRead();
@@ -483,34 +543,52 @@ class DeviceSharingService extends ChangeNotifier {
       StringBuffer lineBuffer = StringBuffer();
 
       late StreamSubscription sub;
-      sub = socket.listen((data) {
-        final text = utf8.decode(data);
-        lineBuffer.write(text);
-        if (lineBuffer.toString().contains('\n')) {
-          final line = lineBuffer.toString().split('\n').first;
-          try {
-            final json = jsonDecode(line) as Map<String, dynamic>;
-            if (json['status'] == 'ACCEPTED') {
-              if (!responseCompleter.isCompleted) responseCompleter.complete(true);
-            } else {
-              item.errorMessage = json['msg'] ?? 'Recipient rejected transfer';
-              if (!responseCompleter.isCompleted) responseCompleter.complete(false);
+      sub = socket.listen(
+        (data) {
+          final text = utf8.decode(data);
+          lineBuffer.write(text);
+          if (lineBuffer.toString().contains('\n')) {
+            final line = lineBuffer.toString().split('\n').first;
+            try {
+              final json = jsonDecode(line) as Map<String, dynamic>;
+              if (json['status'] == 'ACCEPTED') {
+                if (!responseCompleter.isCompleted)
+                  responseCompleter.complete(true);
+              } else {
+                item.errorMessage =
+                    json['msg'] ?? 'Recipient rejected transfer';
+                if (!responseCompleter.isCompleted)
+                  responseCompleter.complete(false);
+              }
+            } catch (error) {
+              item.errorMessage = 'Invalid response from recipient: $error';
+              if (!responseCompleter.isCompleted)
+                responseCompleter.complete(false);
             }
-          } catch (_) {
-            if (!responseCompleter.isCompleted) responseCompleter.complete(false);
           }
-        }
-      });
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          item.errorMessage = 'Could not receive recipient response: $error';
+          if (!responseCompleter.isCompleted) {
+            responseCompleter.complete(false);
+          }
+        },
+      );
 
       final accepted = await responseCompleter.future.timeout(
         const Duration(seconds: 35),
-        onTimeout: () => false,
+        onTimeout: () {
+          item.errorMessage = 'Timed out waiting for recipient approval.';
+          return false;
+        },
       );
 
       await sub.cancel();
 
       if (!accepted) {
-        item.status = item.errorMessage != null ? TransferStatus.rejected : TransferStatus.cancelled;
+        item.status = item.errorMessage != null
+            ? TransferStatus.rejected
+            : TransferStatus.cancelled;
         notifyListeners();
         await socket.close();
         return;
@@ -544,7 +622,8 @@ class DeviceSharingService extends ChangeNotifier {
         final now = DateTime.now();
         final elapsed = now.difference(lastSpeedCheck).inMilliseconds;
         if (elapsed >= 350) {
-          item.speedBytesPerSec = ((bytesSent - lastCheckBytes) / elapsed) * 1000;
+          item.speedBytesPerSec =
+              ((bytesSent - lastCheckBytes) / elapsed) * 1000;
           lastSpeedCheck = now;
           lastCheckBytes = bytesSent;
           notifyListeners();
@@ -568,7 +647,10 @@ class DeviceSharingService extends ChangeNotifier {
 
   void pauseTransfer(String id) {
     _pausedTransferIds.add(id);
-    final item = _transfers.firstWhere((e) => e.id == id, orElse: () => _transfers.first);
+    final item = _transfers.firstWhere(
+      (e) => e.id == id,
+      orElse: () => _transfers.first,
+    );
     item.status = TransferStatus.paused;
     item.speedBytesPerSec = 0;
     notifyListeners();
@@ -576,14 +658,20 @@ class DeviceSharingService extends ChangeNotifier {
 
   void resumeTransfer(String id) {
     _pausedTransferIds.remove(id);
-    final item = _transfers.firstWhere((e) => e.id == id, orElse: () => _transfers.first);
+    final item = _transfers.firstWhere(
+      (e) => e.id == id,
+      orElse: () => _transfers.first,
+    );
     item.status = TransferStatus.transferring;
     notifyListeners();
   }
 
   void cancelTransfer(String id) {
     _pausedTransferIds.remove(id);
-    final item = _transfers.firstWhere((e) => e.id == id, orElse: () => _transfers.first);
+    final item = _transfers.firstWhere(
+      (e) => e.id == id,
+      orElse: () => _transfers.first,
+    );
     item.status = TransferStatus.cancelled;
     _activeTransferSockets[id]?.destroy();
     _activeTransferSockets.remove(id);
@@ -591,11 +679,13 @@ class DeviceSharingService extends ChangeNotifier {
   }
 
   void clearHistory() {
-    _transfers.removeWhere((t) =>
-        t.status == TransferStatus.completed ||
-        t.status == TransferStatus.failed ||
-        t.status == TransferStatus.cancelled ||
-        t.status == TransferStatus.rejected);
+    _transfers.removeWhere(
+      (t) =>
+          t.status == TransferStatus.completed ||
+          t.status == TransferStatus.failed ||
+          t.status == TransferStatus.cancelled ||
+          t.status == TransferStatus.rejected,
+    );
     notifyListeners();
   }
 
@@ -661,8 +751,10 @@ class IncomingTransferPrompt {
 
   String get formattedSize {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
-    if (fileSize < 1024 * 1024 * 1024) return '${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB';
+    if (fileSize < 1024 * 1024)
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    if (fileSize < 1024 * 1024 * 1024)
+      return '${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB';
     return '${(fileSize / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

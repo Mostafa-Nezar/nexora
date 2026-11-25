@@ -113,9 +113,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
@@ -164,23 +162,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildCustomBottomNav() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1324),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: SafeArea(
-        top: false,
+    return SafeArea(
+      top: false,
+      child: Container(
+        key: const Key('main-bottom-navigation'),
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B1324),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Row(
           children: List.generate(_navItems.length, (index) {
             final isSelected = _selectedIndex == index;
@@ -198,7 +197,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.symmetric(vertical: 1),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF10B981).withValues(alpha: 0.07)
@@ -211,8 +210,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           curve: Curves.easeOutCubic,
-                          width: 42,
-                          height: 30,
+                          width: 34,
+                          height: 20,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? const Color(
@@ -226,10 +225,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             color: isSelected
                                 ? const Color(0xFF10B981)
                                 : const Color(0xFF8993A7),
-                            size: 21,
+                            size: 19,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 1),
                         Text(
                           item.label,
                           maxLines: 1,
@@ -240,7 +239,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                             fontWeight: isSelected
                                 ? FontWeight.w600
                                 : FontWeight.w500,
-                            fontSize: 10.5,
+                            fontSize: 9.5,
                             letterSpacing: 0.2,
                           ),
                         ),

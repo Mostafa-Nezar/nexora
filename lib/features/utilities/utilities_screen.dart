@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/widgets/app_toast.dart';
 
 class UtilitiesScreen extends StatefulWidget {
   const UtilitiesScreen({super.key});
@@ -9,27 +10,43 @@ class UtilitiesScreen extends StatefulWidget {
 }
 
 class _UtilitiesScreenState extends State<UtilitiesScreen> {
-  final TextEditingController _phoneController = TextEditingController(text: '123456789');
-  final TextEditingController _urlController = TextEditingController(text: 'https://google.com');
+  final TextEditingController _phoneController = TextEditingController(
+    text: '123456789',
+  );
+  final TextEditingController _urlController = TextEditingController(
+    text: 'https://google.com',
+  );
 
   Future<void> _launchDialer() async {
-    final uri = Uri.parse('tel:${_phoneController.text.trim()}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
+    try {
+      final uri = Uri.parse('tel:${_phoneController.text.trim()}');
+      if (!await canLaunchUrl(uri)) {
+        throw StateError('No phone app can handle this number.');
+      }
+      if (!await launchUrl(uri)) {
+        throw StateError('The phone app did not open the dialer.');
+      }
+      if (mounted) AppToast.success(context, 'Phone dialer opened.');
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open phone dialer')));
+        AppToast.error(context, 'Could not open phone dialer: $error');
       }
     }
   }
 
   Future<void> _launchBrowser() async {
-    final uri = Uri.parse(_urlController.text.trim());
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      final uri = Uri.parse(_urlController.text.trim());
+      if (!await canLaunchUrl(uri)) {
+        throw StateError('No browser can handle this address.');
+      }
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw StateError('The browser did not open the address.');
+      }
+      if (mounted) AppToast.success(context, 'Address opened in your browser.');
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch browser')));
+        AppToast.error(context, 'Could not launch browser: $error');
       }
     }
   }
@@ -39,7 +56,10 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
-        title: const Text('Utilities & System Integrations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Utilities & System Integrations',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF111827),
         elevation: 0,
       ),
@@ -65,7 +85,10 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
                 ElevatedButton.icon(
                   onPressed: _launchDialer,
                   icon: const Icon(Icons.call, color: Colors.white),
-                  label: const Text('Open Native Phone Dialer', style: TextStyle(color: Colors.white)),
+                  label: const Text(
+                    'Open Native Phone Dialer',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
                     minimumSize: const Size.fromHeight(40),
@@ -85,7 +108,10 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
                 ElevatedButton.icon(
                   onPressed: _launchBrowser,
                   icon: const Icon(Icons.open_in_browser, color: Colors.white),
-                  label: const Text('Open in System Browser', style: TextStyle(color: Colors.white)),
+                  label: const Text(
+                    'Open in System Browser',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     minimumSize: const Size.fromHeight(40),
@@ -133,7 +159,11 @@ class _UtilitiesScreenState extends State<UtilitiesScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/widgets/app_toast.dart';
 
 class ConnectivityScreen extends StatefulWidget {
   const ConnectivityScreen({super.key});
@@ -27,24 +28,38 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
       if (mounted) {
         setState(() => _connectionStatus = result);
       }
-      _connectivitySubscription = _connectivity.onConnectivityChanged.listen((result) {
-        if (mounted) {
-          setState(() => _connectionStatus = result);
-        }
-      });
-    } catch (_) {}
+      _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+        (result) {
+          if (mounted) {
+            setState(() => _connectionStatus = result);
+          }
+        },
+        onError: (Object error) {
+          if (mounted) {
+            AppToast.error(context, 'Connectivity monitoring failed: $error');
+          }
+        },
+      );
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(context, 'Could not read connectivity status: $error');
+      }
+    }
   }
 
   Future<void> _openSystemSettings() async {
-    // Attempt standard intent launch or settings URL
-    final uri = Uri.parse('app-settings:');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
+    try {
+      final uri = Uri.parse('app-settings:');
+      if (!await canLaunchUrl(uri)) {
+        throw StateError('System connectivity settings are unavailable.');
+      }
+      if (!await launchUrl(uri)) {
+        throw StateError('The system settings screen did not open.');
+      }
+      if (mounted) AppToast.success(context, 'Connectivity settings opened.');
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Opening connectivity settings...')),
-        );
+        AppToast.error(context, 'Could not open connectivity settings: $error');
       }
     }
   }
@@ -62,7 +77,10 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
-        title: const Text('Connectivity & Networks', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Connectivity & Networks',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF041E26),
         elevation: 0,
       ),
@@ -79,19 +97,28 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Active Status:', style: TextStyle(color: Colors.white70)),
+                    const Text(
+                      'Active Status:',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                     Row(
                       children: [
                         Icon(
-                          isConnected ? Icons.check_circle : Icons.error_outline,
-                          color: isConnected ? Colors.greenAccent : Colors.redAccent,
+                          isConnected
+                              ? Icons.check_circle
+                              : Icons.error_outline,
+                          color: isConnected
+                              ? Colors.greenAccent
+                              : Colors.redAccent,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
                           isConnected ? 'ONLINE' : 'DISCONNECTED',
                           style: TextStyle(
-                            color: isConnected ? Colors.greenAccent : Colors.redAccent,
+                            color: isConnected
+                                ? Colors.greenAccent
+                                : Colors.redAccent,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -102,7 +129,10 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Connection Types: ${_connectionStatus.map((e) => e.name.toUpperCase()).join(", ")}',
-                  style: const TextStyle(color: Colors.cyanAccent, fontFamily: 'monospace'),
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontFamily: 'monospace',
+                  ),
                 ),
               ],
             ),
@@ -124,7 +154,10 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                 ElevatedButton.icon(
                   onPressed: _openSystemSettings,
                   icon: const Icon(Icons.settings, color: Colors.black),
-                  label: const Text('Open System Connectivity Settings', style: TextStyle(color: Colors.black)),
+                  label: const Text(
+                    'Open System Connectivity Settings',
+                    style: TextStyle(color: Colors.black),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.tealAccent,
                     minimumSize: const Size.fromHeight(45),
@@ -161,7 +194,11 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

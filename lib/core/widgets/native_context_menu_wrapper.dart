@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'app_toast.dart';
 
 class NativeContextMenuWrapper extends StatelessWidget {
   final Widget child;
   final String title;
   final String shareContent;
   final VoidCallback? onCopy;
-  final VoidCallback? onShare;
+  final Future<void> Function()? onShare;
   final VoidCallback? onSave;
   final VoidCallback? onOpenWith;
 
@@ -32,7 +33,10 @@ class NativeContextMenuWrapper extends StatelessWidget {
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 16.0,
+              horizontal: 8.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -56,28 +60,66 @@ class NativeContextMenuWrapper extends StatelessWidget {
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const Icon(Icons.copy, color: Colors.cyanAccent),
-                  title: const Text('Copy to Clipboard', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: shareContent));
+                  title: const Text(
+                    'Copy to Clipboard',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Copied to Clipboard!')),
-                    );
-                    onCopy?.call();
+                    try {
+                      await Clipboard.setData(
+                        ClipboardData(text: shareContent),
+                      );
+                      onCopy?.call();
+                      if (context.mounted) {
+                        AppToast.success(context, 'Copied to clipboard.');
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        AppToast.error(
+                          context,
+                          'Could not copy to clipboard: $error',
+                        );
+                      }
+                    }
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.share, color: Colors.purpleAccent),
-                  title: const Text('Share Sheet (Native OS)', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    onShare?.call();
-                  },
+                  title: const Text(
+                    'Share Sheet (Native OS)',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  enabled: onShare != null,
+                  onTap: onShare == null
+                      ? null
+                      : () async {
+                          Navigator.pop(ctx);
+                          try {
+                            await onShare!();
+                            if (context.mounted) {
+                              AppToast.success(context, 'Share sheet opened.');
+                            }
+                          } catch (error) {
+                            if (context.mounted) {
+                              AppToast.error(
+                                context,
+                                'Could not share item: $error',
+                              );
+                            }
+                          }
+                        },
                 ),
                 if (onSave != null)
                   ListTile(
-                    leading: const Icon(Icons.save_alt, color: Colors.amberAccent),
-                    title: const Text('Save / Export', style: TextStyle(color: Colors.white)),
+                    leading: const Icon(
+                      Icons.save_alt,
+                      color: Colors.amberAccent,
+                    ),
+                    title: const Text(
+                      'Save / Export',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     onTap: () {
                       Navigator.pop(ctx);
                       onSave?.call();
@@ -85,8 +127,14 @@ class NativeContextMenuWrapper extends StatelessWidget {
                   ),
                 if (onOpenWith != null)
                   ListTile(
-                    leading: const Icon(Icons.open_in_new, color: Colors.blueAccent),
-                    title: const Text('Open With Other App', style: TextStyle(color: Colors.white)),
+                    leading: const Icon(
+                      Icons.open_in_new,
+                      color: Colors.blueAccent,
+                    ),
+                    title: const Text(
+                      'Open With Other App',
+                      style: TextStyle(color: Colors.white),
+                    ),
                     onTap: () {
                       Navigator.pop(ctx);
                       onOpenWith?.call();

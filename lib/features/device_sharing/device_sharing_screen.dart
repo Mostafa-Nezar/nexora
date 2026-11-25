@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_toast.dart';
 import 'models/transfer_models.dart';
 import 'services/device_sharing_service.dart';
 
@@ -18,20 +20,41 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
   late TabController _tabController;
   final DeviceSharingService _service = DeviceSharingService();
   final List<File> _selectedFiles = [];
+  final Map<String, TransferStatus> _observedTransferStatuses = {};
+  StreamSubscription<String>? _errorSubscription;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _service.initialize();
     _service.addListener(_onServiceUpdate);
+    _errorSubscription = _service.errors.listen((message) {
+      if (mounted) AppToast.error(context, message);
+    });
+    _service.initialize();
 
     // Listen to incoming prompts
     _service.incomingTransfers.listen(_handleIncomingTransferPrompt);
   }
 
   void _onServiceUpdate() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    for (final transfer in _service.transfers) {
+      final previousStatus = _observedTransferStatuses[transfer.id];
+      if (previousStatus == transfer.status) continue;
+      _observedTransferStatuses[transfer.id] = transfer.status;
+
+      if (transfer.status == TransferStatus.completed) {
+        AppToast.success(context, '${transfer.fileName} transfer completed.');
+      } else if (transfer.status == TransferStatus.failed ||
+          transfer.status == TransferStatus.rejected) {
+        AppToast.error(
+          context,
+          transfer.errorMessage ?? '${transfer.fileName} transfer failed.',
+        );
+      }
+    }
+    setState(() {});
   }
 
   void _handleIncomingTransferPrompt(IncomingTransferPrompt prompt) {
@@ -62,7 +85,11 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               const CircleAvatar(
                 radius: 30,
                 backgroundColor: Color(0xFF1E3A8A),
-                child: Icon(Icons.download_rounded, color: Color(0xFF60A5FA), size: 32),
+                child: Icon(
+                  Icons.download_rounded,
+                  color: Color(0xFF60A5FA),
+                  size: 32,
+                ),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -81,7 +108,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               ),
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0F172A),
                   borderRadius: BorderRadius.circular(14),
@@ -89,7 +119,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.insert_drive_file, color: Color(0xFF38BDF8)),
+                    const Icon(
+                      Icons.insert_drive_file,
+                      color: Color(0xFF38BDF8),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -107,7 +140,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                           ),
                           Text(
                             prompt.formattedSize,
-                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                            style: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -124,13 +160,18 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                         foregroundColor: Colors.redAccent,
                         side: const BorderSide(color: Colors.redAccent),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () {
                         prompt.completer?.complete(false);
                         Navigator.pop(ctx);
                       },
-                      child: const Text('Decline', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Decline',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -140,14 +181,19 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                         backgroundColor: const Color(0xFF10B981),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: () {
                         prompt.completer?.complete(true);
                         Navigator.pop(ctx);
                         _tabController.animateTo(2); // Jump to Transfer tab
                       },
-                      child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Accept',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -163,6 +209,7 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
   @override
   void dispose() {
     _service.removeListener(_onServiceUpdate);
+    _errorSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -173,27 +220,34 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
         allowMultiple: true,
         type: FileType.any,
       );
-      if (result != null && result.paths.isNotEmpty) {
-        setState(() {
-          for (final path in result.paths) {
-            if (path != null) {
-              _selectedFiles.add(File(path));
-            }
+      if (result != null) {
+        final files = result.paths
+            .whereType<String>()
+            .map((path) => File(path))
+            .toList();
+        if (files.isEmpty) {
+          if (mounted) {
+            AppToast.error(
+              context,
+              'The selected files do not have valid paths.',
+            );
           }
+          return;
+        }
+        if (!mounted) return;
+        setState(() {
+          _selectedFiles.addAll(files);
         });
+        AppToast.success(context, 'Selected ${files.length} file(s).');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking files: $e')),
-      );
+      if (mounted) AppToast.error(context, 'Could not pick files: $e');
     }
   }
 
-  void _sendToDevice(DiscoveredDevice device) async {
+  Future<void> _sendToDevice(DiscoveredDevice device) async {
     if (_selectedFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one file to send.')),
-      );
+      AppToast.error(context, 'Select at least one file before sending.');
       return;
     }
 
@@ -203,7 +257,41 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
     });
 
     _tabController.animateTo(2); // Switch to Transfers tab
-    await _service.sendFiles(targetDevice: device, files: filesToSend);
+    try {
+      await _service.sendFiles(targetDevice: device, files: filesToSend);
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(
+          context,
+          'Could not send files to ${device.name}: $error',
+        );
+      }
+    }
+  }
+
+  void _clearHistory() {
+    final previousCount = _service.transfers.length;
+    _service.clearHistory();
+    if (_service.transfers.length < previousCount) {
+      AppToast.success(context, 'Finished transfers cleared.');
+    } else {
+      AppToast.error(context, 'There are no finished transfers to clear.');
+    }
+  }
+
+  void _pauseTransfer(String id) {
+    _service.pauseTransfer(id);
+    AppToast.success(context, 'Transfer paused.');
+  }
+
+  void _resumeTransfer(String id) {
+    _service.resumeTransfer(id);
+    AppToast.success(context, 'Transfer resumed.');
+  }
+
+  void _cancelTransfer(String id) {
+    _service.cancelTransfer(id);
+    AppToast.success(context, 'Transfer cancelled.');
   }
 
   void _showPairingDialog() {
@@ -212,7 +300,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Pair with QR / PIN', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Pair with QR / PIN',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -223,7 +314,8 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                 borderRadius: BorderRadius.circular(16),
               ),
               child: QrImageView(
-                data: '${_service.deviceId}|${_service.currentLocalIp}|${DeviceSharingService.tcpTransferPort}|${_service.currentPin}',
+                data:
+                    '${_service.deviceId}|${_service.currentLocalIp}|${DeviceSharingService.tcpTransferPort}|${_service.currentPin}',
                 version: QrVersions.auto,
                 size: 180.0,
               ),
@@ -248,7 +340,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close', style: TextStyle(color: Color(0xFF38BDF8))),
+            child: const Text(
+              'Close',
+              style: TextStyle(color: Color(0xFF38BDF8)),
+            ),
           ),
         ],
       ),
@@ -264,7 +359,10 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Connect by IP & PIN', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Connect by IP & PIN',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -278,7 +376,9 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                 hintStyle: const TextStyle(color: Colors.white30),
                 filled: true,
                 fillColor: const Color(0xFF0F172A),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -293,7 +393,9 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                 hintStyle: const TextStyle(color: Colors.white30),
                 filled: true,
                 fillColor: const Color(0xFF0F172A),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -301,10 +403,15 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white60)),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white60),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+            ),
             onPressed: () {
               final ip = ipController.text.trim();
               final pin = pinController.text.trim();
@@ -320,9 +427,14 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                 );
                 Navigator.pop(ctx);
                 _sendToDevice(manualDevice);
+              } else {
+                AppToast.error(context, 'Enter the target device IP address.');
               }
             },
-            child: const Text('Connect & Send', style: TextStyle(color: Colors.black)),
+            child: const Text(
+              'Connect & Send',
+              style: TextStyle(color: Colors.black),
+            ),
           ),
         ],
       ),
@@ -369,7 +481,9 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
             const Tab(icon: Icon(Icons.devices_other), text: 'Nearby Devices'),
             Tab(
               icon: Badge(
-                isLabelVisible: _service.transfers.any((t) => t.status == TransferStatus.transferring),
+                isLabelVisible: _service.transfers.any(
+                  (t) => t.status == TransferStatus.transferring,
+                ),
                 child: const Icon(Icons.swap_horiz_rounded),
               ),
               text: 'Transfers',
@@ -379,11 +493,7 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: [
-          _buildSendTab(),
-          _buildNearbyTab(),
-          _buildTransfersTab(),
-        ],
+        children: [_buildSendTab(), _buildNearbyTab(), _buildTransfersTab()],
       ),
     );
   }
@@ -405,12 +515,17 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1E3A8A),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text(
                     'Select Files to Share',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -421,7 +536,7 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                   icon: const Icon(Icons.clear_all, color: Colors.redAccent),
                   tooltip: 'Clear selection',
                 ),
-              ]
+              ],
             ],
           ),
         ),
@@ -435,11 +550,17 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               children: [
                 Text(
                   'Selected Items (${_selectedFiles.length})',
-                  style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   _formatTotalSize(_selectedFiles),
-                  style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -470,16 +591,28 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(_getFileIcon(name), color: const Color(0xFF38BDF8), size: 22),
+                          Icon(
+                            _getFileIcon(name),
+                            color: const Color(0xFF38BDF8),
+                            size: 22,
+                          ),
                           GestureDetector(
-                            onTap: () => setState(() => _selectedFiles.removeAt(i)),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white60),
+                            onTap: () =>
+                                setState(() => _selectedFiles.removeAt(i)),
+                            child: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.white60,
+                            ),
                           ),
                         ],
                       ),
                       Text(
                         name,
-                        style: const TextStyle(color: Colors.white, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -500,12 +633,20 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
             children: [
               const Text(
                 'Send To Nearby Device:',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
               IconButton(
-                icon: const Icon(Icons.refresh, color: Color(0xFF38BDF8), size: 20),
+                icon: const Icon(
+                  Icons.refresh,
+                  color: Color(0xFF38BDF8),
+                  size: 20,
+                ),
                 onPressed: () => _service.broadcastBeacon(),
-              )
+              ),
             ],
           ),
         ),
@@ -515,7 +656,8 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               ? _buildEmptyState(
                   icon: Icons.radar,
                   title: 'Searching for nearby devices...',
-                  subtitle: 'Make sure the recipient has Tools open on the Device Sharing tab.',
+                  subtitle:
+                      'Make sure the recipient has Tools open on the Device Sharing tab.',
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -525,28 +667,48 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                     return Card(
                       color: const Color(0xFF131D31),
                       margin: const EdgeInsets.only(bottom: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFF1E3A8A),
-                          child: Icon(_getPlatformIcon(dev.platform), color: const Color(0xFF60A5FA)),
+                          child: Icon(
+                            _getPlatformIcon(dev.platform),
+                            color: const Color(0xFF60A5FA),
+                          ),
                         ),
                         title: Text(
                           dev.name,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         subtitle: Text(
                           '${dev.platform.name.toUpperCase()} • ${dev.ip}',
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
                         ),
                         trailing: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () => _sendToDevice(dev),
-                          icon: const Icon(Icons.send, size: 16, color: Colors.white),
-                          label: const Text('Send', style: TextStyle(color: Colors.white)),
+                          icon: const Icon(
+                            Icons.send,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          label: const Text(
+                            'Send',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                     );
@@ -581,7 +743,11 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               CircleAvatar(
                 radius: 26,
                 backgroundColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                child: const Icon(Icons.wifi_tethering, color: Color(0xFF38BDF8), size: 28),
+                child: const Icon(
+                  Icons.wifi_tethering,
+                  color: Color(0xFF38BDF8),
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -590,16 +756,26 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                   children: [
                     Text(
                       _service.deviceName,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Ready to receive • IP: ${_service.currentLocalIp}',
-                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12),
+                      style: const TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 12,
+                      ),
                     ),
                     Text(
                       'Security PIN: ${_service.currentPin}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -607,7 +783,7 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               IconButton(
                 icon: const Icon(Icons.qr_code, color: Colors.white),
                 onPressed: _showPairingDialog,
-              )
+              ),
             ],
           ),
         ),
@@ -619,12 +795,22 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
             children: [
               Text(
                 'Available Devices (${_service.nearbyDevices.length})',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               TextButton.icon(
                 onPressed: () => _service.broadcastBeacon(),
-                icon: const Icon(Icons.radar, color: Color(0xFF38BDF8), size: 18),
-                label: const Text('Rescan', style: TextStyle(color: Color(0xFF38BDF8))),
+                icon: const Icon(
+                  Icons.radar,
+                  color: Color(0xFF38BDF8),
+                  size: 18,
+                ),
+                label: const Text(
+                  'Rescan',
+                  style: TextStyle(color: Color(0xFF38BDF8)),
+                ),
               ),
             ],
           ),
@@ -635,7 +821,8 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               ? _buildEmptyState(
                   icon: Icons.cell_tower,
                   title: 'No devices found nearby',
-                  subtitle: 'Make sure other devices are connected to the same Wi-Fi or Hotspot.',
+                  subtitle:
+                      'Make sure other devices are connected to the same Wi-Fi or Hotspot.',
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -645,24 +832,37 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                     return Card(
                       color: const Color(0xFF131D31),
                       margin: const EdgeInsets.only(bottom: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFF1E3A8A),
-                          child: Icon(_getPlatformIcon(dev.platform), color: const Color(0xFF60A5FA)),
+                          child: Icon(
+                            _getPlatformIcon(dev.platform),
+                            color: const Color(0xFF60A5FA),
+                          ),
                         ),
                         title: Text(
                           dev.name,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         subtitle: Text(
                           '${dev.platform.name.toUpperCase()} • ${dev.ip}:${dev.port}',
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
                         ),
                         trailing: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF38BDF8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () {
                             _pickFiles().then((_) {
@@ -671,7 +871,13 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                               }
                             });
                           },
-                          child: const Text('Share', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Share',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -690,7 +896,8 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
       return _buildEmptyState(
         icon: Icons.swap_horiz_rounded,
         title: 'No transfers yet',
-        subtitle: 'Files sent or received will appear here with live speed and progress.',
+        subtitle:
+            'Files sent or received will appear here with live speed and progress.',
       );
     }
 
@@ -703,12 +910,18 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
             children: [
               Text(
                 'Transfers (${_service.transfers.length})',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               TextButton(
-                onPressed: () => _service.clearHistory(),
-                child: const Text('Clear Finished', style: TextStyle(color: Color(0xFF94A3B8))),
-              )
+                onPressed: _clearHistory,
+                child: const Text(
+                  'Clear Finished',
+                  style: TextStyle(color: Color(0xFF94A3B8)),
+                ),
+              ),
             ],
           ),
         ),
@@ -779,40 +992,64 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
                   children: [
                     Text(
                       item.fileName,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${isSending ? "Sending to" : "Receiving from"} ${item.remoteDeviceName} • ${item.formattedSize}',
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      style: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ),
               if (item.status == TransferStatus.transferring) ...[
                 IconButton(
-                  icon: const Icon(Icons.pause, color: Colors.orangeAccent, size: 20),
-                  onPressed: () => _service.pauseTransfer(item.id),
+                  icon: const Icon(
+                    Icons.pause,
+                    color: Colors.orangeAccent,
+                    size: 20,
+                  ),
+                  onPressed: () => _pauseTransfer(item.id),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
-                  onPressed: () => _service.cancelTransfer(item.id),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                  onPressed: () => _cancelTransfer(item.id),
                 ),
               ] else if (item.status == TransferStatus.paused) ...[
                 IconButton(
-                  icon: const Icon(Icons.play_arrow, color: Color(0xFF10B981), size: 20),
-                  onPressed: () => _service.resumeTransfer(item.id),
+                  icon: const Icon(
+                    Icons.play_arrow,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
+                  onPressed: () => _resumeTransfer(item.id),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
-                  onPressed: () => _service.cancelTransfer(item.id),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.redAccent,
+                    size: 20,
+                  ),
+                  onPressed: () => _cancelTransfer(item.id),
                 ),
-              ]
+              ],
             ],
           ),
-          if (item.status == TransferStatus.transferring || item.status == TransferStatus.paused) ...[
+          if (item.status == TransferStatus.transferring ||
+              item.status == TransferStatus.paused) ...[
             const SizedBox(height: 10),
             LinearProgressIndicator(
               value: item.progress,
@@ -826,11 +1063,18 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
               children: [
                 Text(
                   '${(item.progress * 100).toStringAsFixed(1)}% • ${item.formattedSpeed}',
-                  style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Text(
                   'ETA: ${item.formattedTimeRemaining}',
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -873,7 +1117,11 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -943,7 +1191,8 @@ class _DeviceSharingScreenState extends State<DeviceSharingScreen>
     }
     if (total < 1024) return '$total B';
     if (total < 1024 * 1024) return '${(total / 1024).toStringAsFixed(1)} KB';
-    if (total < 1024 * 1024 * 1024) return '${(total / (1024 * 1024)).toStringAsFixed(2)} MB';
+    if (total < 1024 * 1024 * 1024)
+      return '${(total / (1024 * 1024)).toStringAsFixed(2)} MB';
     return '${(total / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

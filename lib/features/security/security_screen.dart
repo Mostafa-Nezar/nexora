@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../core/widgets/app_toast.dart';
 
 class SecurityScreen extends StatefulWidget {
   const SecurityScreen({super.key});
@@ -37,14 +38,18 @@ class _SecurityScreenState extends State<SecurityScreen> {
         });
       }
     } catch (e) {
-      setState(() => _authStatus = 'Error checking biometrics: $e');
+      if (mounted) {
+        setState(() => _authStatus = 'Error checking biometrics: $e');
+        AppToast.error(context, 'Could not check biometric support: $e');
+      }
     }
   }
 
   Future<void> _authenticate() async {
     try {
       final authenticated = await _auth.authenticate(
-        localizedReason: 'Authenticate to access secure vault and OS credentials',
+        localizedReason:
+            'Authenticate to access secure vault and OS credentials',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,
@@ -53,14 +58,33 @@ class _SecurityScreenState extends State<SecurityScreen> {
       if (mounted) {
         setState(() {
           _isAuthenticated = authenticated;
-          _authStatus = authenticated ? 'Authentication Successful!' : 'Authentication Failed / Cancelled';
+          _authStatus = authenticated
+              ? 'Authentication Successful!'
+              : 'Authentication Failed / Cancelled';
         });
         if (authenticated) {
           HapticFeedback.heavyImpact();
+          AppToast.success(context, 'Authentication successful.');
+        } else {
+          AppToast.error(
+            context,
+            'Authentication was cancelled or unsuccessful.',
+          );
         }
       }
     } on PlatformException catch (e) {
-      setState(() => _authStatus = 'Platform Exception: ${e.message}');
+      if (mounted) {
+        setState(() => _authStatus = 'Platform Exception: ${e.message}');
+        AppToast.error(
+          context,
+          'Authentication failed: ${e.message ?? e.code}',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _authStatus = 'Authentication failed: $error');
+        AppToast.error(context, 'Authentication failed: $error');
+      }
     }
   }
 
@@ -69,7 +93,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF030712),
       appBar: AppBar(
-        title: const Text('Security & Biometrics', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Security & Biometrics',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFF200717),
         elevation: 0,
       ),
@@ -86,11 +113,16 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Hardware Biometric Support:', style: TextStyle(color: Colors.white70)),
+                    const Text(
+                      'Hardware Biometric Support:',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                     Text(
                       _canCheckBiometrics ? 'SUPPORTED' : 'NOT DETECTED',
                       style: TextStyle(
-                        color: _canCheckBiometrics ? Colors.greenAccent : Colors.redAccent,
+                        color: _canCheckBiometrics
+                            ? Colors.greenAccent
+                            : Colors.redAccent,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -108,13 +140,17 @@ class _SecurityScreenState extends State<SecurityScreen> {
                       Icon(
                         _isAuthenticated ? Icons.lock_open : Icons.lock_outline,
                         size: 56,
-                        color: _isAuthenticated ? Colors.greenAccent : Colors.pinkAccent,
+                        color: _isAuthenticated
+                            ? Colors.greenAccent
+                            : Colors.pinkAccent,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _authStatus,
                         style: TextStyle(
-                          color: _isAuthenticated ? Colors.greenAccent : Colors.pinkAccent,
+                          color: _isAuthenticated
+                              ? Colors.greenAccent
+                              : Colors.pinkAccent,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -125,7 +161,10 @@ class _SecurityScreenState extends State<SecurityScreen> {
                 ElevatedButton.icon(
                   onPressed: _authenticate,
                   icon: const Icon(Icons.security, color: Colors.white),
-                  label: const Text('Authenticate with OS Biometrics', style: TextStyle(color: Colors.white)),
+                  label: const Text(
+                    'Authenticate with OS Biometrics',
+                    style: TextStyle(color: Colors.white),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEC4899),
                     minimumSize: const Size.fromHeight(45),
@@ -183,7 +222,11 @@ class _SecurityScreenState extends State<SecurityScreen> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
