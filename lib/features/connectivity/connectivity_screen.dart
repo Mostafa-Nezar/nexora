@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'bluetooth_screen.dart';
 import '../../core/widgets/app_toast.dart';
 
 class ConnectivityScreen extends StatefulWidget {
@@ -160,6 +161,26 @@ class _ConnectivityScreenState extends State<ConnectivityScreen> {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.tealAccent,
+                    minimumSize: const Size.fromHeight(45),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BluetoothScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.bluetooth, color: Colors.white),
+                  label: const Text(
+                    'Bluetooth Hardware Manager & Scanner',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
                     minimumSize: const Size.fromHeight(45),
                   ),
                 ),

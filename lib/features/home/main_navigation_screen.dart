@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../scanner/scanner_screen.dart';
 import '../device_controls/device_controls_screen.dart';
@@ -64,22 +66,42 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final bool canGoBack = _selectedIndex != 0 || Navigator.canPop(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Stack(
           children: [
-            // Custom Header with Back Button and nexora.png logo
-            _buildCustomHeader(canGoBack),
+            // 1. Full-screen content flowing freely from top to bottom edge
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  _buildCustomHeader(canGoBack),
+                  Expanded(
+                    child: IndexedStack(index: _selectedIndex, children: _pages),
+                  ),
+                ],
+              ),
+            ),
 
-            // Active Page Body
-            Expanded(
-              child: IndexedStack(index: _selectedIndex, children: _pages),
+            // 2. Truly floating bottom navigation bar overlaying the content
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildCustomBottomNav(),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _buildCustomBottomNav(),
     );
   }
 
@@ -162,89 +184,89 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Widget _buildCustomBottomNav() {
-    return SafeArea(
-      top: false,
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: bottomInset > 0 ? bottomInset + 8 : 16,
+      ),
       child: Container(
         key: const Key('main-bottom-navigation'),
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        height: 62,
         decoration: BoxDecoration(
-          color: const Color(0xFF0B1324),
-          borderRadius: BorderRadius.circular(26),
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(36),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
+              color: Colors.black.withValues(alpha: 0.7),
               blurRadius: 24,
+              spreadRadius: 2,
               offset: const Offset(0, 8),
             ),
           ],
-          border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(_navItems.length, (index) {
             final isSelected = _selectedIndex == index;
             final item = _navItems[index];
 
-            return Expanded(
-              child: Semantics(
-                button: true,
-                selected: isSelected,
-                label: item.label,
-                child: InkWell(
-                  onTap: () => _onItemTapped(index),
-                  borderRadius: BorderRadius.circular(18),
-                  splashColor: const Color(0xFF10B981).withValues(alpha: 0.12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(vertical: 1),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF10B981).withValues(alpha: 0.07)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          width: 34,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(
-                                    0xFF10B981,
-                                  ).withValues(alpha: 0.16)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            color: isSelected
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFF8993A7),
-                            size: 19,
-                          ),
-                        ),
-                        const SizedBox(height: 1),
+            return Semantics(
+              button: true,
+              selected: isSelected,
+              label: item.label,
+              child: GestureDetector(
+                onTap: () => _onItemTapped(index),
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSelected ? 16 : 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.surface
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(30),
+                    border: isSelected
+                        ? Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            width: 1,
+                          )
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFF6B7280),
+                        size: 22,
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(width: 8),
                         Text(
                           item.label,
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF8993A7),
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            fontSize: 9.5,
-                            letterSpacing: 0.2,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -267,3 +289,4 @@ class _NavItemData {
     required this.label,
   });
 }
+

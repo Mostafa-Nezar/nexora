@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import '../connectivity/bluetooth_screen.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../core/widgets/native_context_menu_wrapper.dart';
 
@@ -188,6 +189,43 @@ class _DeviceControlsScreenState extends State<DeviceControlsScreen> {
                       'Flashlight control is not available yet.',
                     );
                   },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Bluetooth Manager & Hardware Scanner
+          _buildCard(
+            title: 'Bluetooth & Hardware Radio',
+            icon: Icons.bluetooth,
+            accentColor: Colors.cyanAccent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Scan nearby BLE/Bluetooth devices, inspect signal strength (RSSI), GATT services, and connect directly.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const BluetoothScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.bluetooth_searching, color: Colors.white),
+                  label: const Text(
+                    'Open Bluetooth Manager & Scanner',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    minimumSize: const Size.fromHeight(44),
+                  ),
                 ),
               ],
             ),

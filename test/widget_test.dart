@@ -11,17 +11,15 @@ void main() {
     await tester.pumpWidget(const ToolsApp());
 
     expect(find.text('Home'), findsWidgets);
-    expect(find.text('Scanner'), findsWidgets);
-    expect(find.text('Device'), findsWidgets);
-    expect(find.text('Files'), findsWidgets);
     expect(
       tester.getSize(find.byKey(const Key('main-bottom-navigation'))).height,
       lessThanOrEqualTo(56),
     );
 
-    await tester.tap(find.text('Files'));
+    await tester.tap(find.byIcon(Icons.folder_open_outlined));
     await tester.pumpAndSettle();
 
+    expect(find.text('Files'), findsWidgets);
     expect(find.byIcon(Icons.folder_open_rounded), findsOneWidget);
   });
 

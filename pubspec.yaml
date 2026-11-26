@@ -37,6 +37,7 @@ dependencies:
   battery_plus: ^6.2.1
   sensors_plus: ^6.1.1
   device_info_plus: ^11.2.0
+  flutter_blue_plus: ^1.35.0
 
   # Connectivity
   connectivity_plus: ^6.1.1
@@ -67,6 +68,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.8
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -81,6 +84,29 @@ flutter:
 
   assets:
     - assets/nexora.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/nexora.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#010705"
+  adaptive_icon_foreground: "assets/nexora.png"
+
+flutter_native_splash:
+  color: "#030712"
+  image: "assets/nexora.png"
+  color_dark: "#030712"
+  image_dark: "assets/nexora.png"
+  android_12:
+    color: "#030712"
+    image: "assets/nexora.png"
+    icon_background_color: "#010705"
+  fullscreen: true
+  android: true
+  ios: true
+
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
