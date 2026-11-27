@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:tools/core/widgets/app_toast.dart';
-import 'package:tools/main.dart';
+import 'package:nexora/core/widgets/app_toast.dart';
+import 'package:nexora/main.dart';
 
 void main() {
   testWidgets('bottom navigation shows English labels and changes pages', (
